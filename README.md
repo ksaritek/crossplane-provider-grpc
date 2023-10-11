@@ -47,4 +47,16 @@ make provider.addtype provider=${provider_name} group=${group} kind=${type}
 
 # generate the code
 make generate
+
+# run grpc server
+go run ./grpc-server/main.go
+
+# run controller
+make run
+
+# apply configs under package/crds
+kubectl apply -f package/crds
+
+# update example yaml
+kubectl apply -f ./examples/sample/example.yaml
 ```

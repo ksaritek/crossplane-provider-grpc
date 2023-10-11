@@ -162,8 +162,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
-	fmt.Printf("Observed: %+v", user)
+	fmt.Printf(">>> Observing: %+v\n", cr)
+	fmt.Printf(">>> Observed: %+v\n", user)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -183,13 +183,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	fmt.Println("Create is called")
+	fmt.Println(">>>> Create is called")
 	cr, ok := mg.(*v1alpha1.User)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
+	fmt.Printf(">>>> Creating: %+v\n", cr)
 
 	name := ""
 	if cr.Spec.ForProvider.Name != nil {
@@ -220,7 +220,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotUser)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	fmt.Printf(">>>> Updating: %+v\n", cr)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -235,7 +235,12 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotUser)
 	}
 
-	fmt.Printf("Deleting: %+v", cr)
+	fmt.Printf(">>>> Deleting: %+v\n", cr)
+	user, err := c.service.userCli.DeleteUser(ctx, &userapi.GetRequest{Id: cr.Spec.ForProvider.Id})
+	if err != nil {
+		return errors.Wrap(err, "cannot delete user")
+	}
 
+	fmt.Printf(">>> Deleted: %+v\n", user)
 	return nil
 }

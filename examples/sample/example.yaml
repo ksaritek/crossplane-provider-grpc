@@ -4,8 +4,8 @@ metadata:
   name: example
 spec:
   forProvider:
-    id: "example"
-    name: "example"
+    id: "1"
+    name: "John Doe"
     email: "john@example.com"
   # providerConfigRef:
   #   name: example
