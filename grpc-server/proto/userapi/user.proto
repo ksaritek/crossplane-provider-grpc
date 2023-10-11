@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package userapi;
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+message UserResponse {
+  string status = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message GetRequest {
+  string id = 1;
+}
+
+service UserService {
+  rpc CreateUser(User) returns (UserResponse);
+
+  rpc GetUser(GetRequest) returns (User);
+
+  rpc UpdateUser(User) returns (UserResponse);
+
+  rpc DeleteUser(GetRequest) returns (UserResponse);
+}

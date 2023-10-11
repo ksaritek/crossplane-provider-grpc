@@ -31,14 +31,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-
 	"github.com/crossplane/provider-userprovider/apis/playground/v1alpha1"
 	apisv1alpha1 "github.com/crossplane/provider-userprovider/apis/v1alpha1"
 	"github.com/crossplane/provider-userprovider/internal/features"
+	"github.com/ksaritek/crossplane-provider-grpc/grpc-server/proto/gen/go/userapi"
 )
 
 const (
-	errNotUser    = "managed resource is not a User custom resource"
+	errNotUser      = "managed resource is not a User custom resource"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -47,10 +47,12 @@ const (
 )
 
 // A NoOpService does nothing.
-type NoOpService struct{}
+type UserService struct {
+	userCli userapi.UserServiceClient
+}
 
 var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
+	newNoOpService = func(_ []byte) (interface{}, error) { return &UserService{}, nil }
 )
 
 // Setup adds a controller that reconciles User managed resources.
