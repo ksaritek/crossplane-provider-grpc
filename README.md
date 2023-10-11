@@ -1,38 +1,50 @@
-# provider-template
+# Crossplane sample that talks through Grpc Server
 
-`provider-template` is a minimal [Crossplane](https://crossplane.io/) Provider
-that is meant to be used as a template for implementing new Providers. It comes
-with the following features that are meant to be refactored:
+That project is an example for crossplane provider. Provider talks to grpc server to do CRUD operation
 
-- A `ProviderConfig` type that only points to a credentials `Secret`.
-- A `MyType` resource type that serves as an example managed resource.
-- A managed resource controller that reconciles `MyType` objects and simply
-  prints their configuration in its `Observe` method.
+## prepare local k8s cluster
 
-## Developing
+### kind
 
-1. Use this repository as a template to create a new one.
-1. Run `make submodules` to initialize the "build" Make submodule we use for CI/CD.
-1. Rename the provider by running the following command:
-```shell
-  export provider_name=MyProvider # Camel case, e.g. GitHub
-  make provider.prepare provider=${provider_name}
+```bash
+kind create cluster --name k8s-crossplane
+kind get clusters
+kubectl cluster-info --context kind-k8s-crossplane
+## export kubeconfig
+export KUBECONFIG="$(kind get kubeconfig --name='k8s-crossplane')"
 ```
-4. Add your new type by running the following command:
-```shell
-  export group=sample # lower case e.g. core, cache, database, storage, etc.
-  export type=MyType # Camel casee.g. Bucket, Database, CacheCluster, etc.
-  make provider.addtype provider=${provider_name} group=${group} kind=${type}
+
+### crossplane install
+
+```bash
+helm repo add crossplane-stable https://charts.crossplane.io/stable
+helm repo update
+helm install crossplane \
+--namespace crossplane-system \
+--create-namespace crossplane-stable/crossplane
 ```
-5. Replace the *sample* group with your new group in apis/{provider}.go
-5. Replace the *mytype* type with your new type in internal/controller/{provider}.go
-5. Replace the default controller and ProviderConfig implementations with your own
-5. Run `make reviewable` to run code generation, linters, and tests.
-5. Run `make build` to build the provider.
 
-Refer to Crossplane's [CONTRIBUTING.md] file for more information on how the
-Crossplane community prefers to work. The [Provider Development][provider-dev]
-guide may also be of use.
+!!! if you run controller as an image instead of `make run`, use `host.docker.internal` to reach grpc-server running locally from local k8s cluster https://docs.docker.com/desktop/networking/#i-want-to-connect-from-a-container-to-a-service-on-the-host
 
-[CONTRIBUTING.md]: https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md
-[provider-dev]: https://github.com/crossplane/crossplane/blob/master/contributing/guide-provider-development.md
+## clone [provider userprovider](https://github.com/crossplane/provider-userprovider) and prepare provider
+
+```bash
+# fetch the [upbound/build] submodule by running the following
+make submodules
+
+# update template with your provider name
+export provider_name=UserProvider
+make provider.prepare provider=${provider_name}
+
+# add User kind under playground group
+export group=playground
+export type=User
+make provider.addtype provider=${provider_name} group=${group} kind=${type}
+
+# register new APIs and Controllers
+## 1. apis/userprovider.go
+## 2. internal/controller/userprovider.go
+
+# generate the code
+make generate
+```
