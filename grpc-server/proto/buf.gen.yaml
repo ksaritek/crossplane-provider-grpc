@@ -2,7 +2,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: https://github.com/ksaritek/crossplane-provider-grpc/grpc-server/proto/gen/go
+    default: github.com/crossplane/provider-userprovider/grpc-server/proto/gen/go
 plugins:
   - plugin: buf.build/protocolbuffers/go:v1.30.0
     out: gen/go

@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/ksaritek/crossplane-provider-grpc/grpc-server/proto/gen/go/userapi"
+	"github.com/crossplane/provider-userprovider/grpc-server/proto/gen/go/userapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 

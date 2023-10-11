@@ -67,10 +67,14 @@ spec:
               forProvider:
                 description: UserParameters are the configurable fields of a User.
                 properties:
-                  configurableField:
+                  email:
+                    type: string
+                  id:
+                    type: string
+                  name:
                     type: string
                 required:
-                - configurableField
+                - id
                 type: object
               managementPolicies:
                 default:

@@ -1,0 +1,11 @@
+apiVersion: playground.userprovider.crossplane.io/v1alpha1
+kind: User
+metadata:
+  name: example
+spec:
+  forProvider:
+    id: "example"
+    name: "example"
+    email: "john@example.com"
+  # providerConfigRef:
+  #   name: example

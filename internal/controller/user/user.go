@@ -19,9 +19,13 @@ package user
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,8 +37,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/provider-userprovider/apis/playground/v1alpha1"
 	apisv1alpha1 "github.com/crossplane/provider-userprovider/apis/v1alpha1"
+	"github.com/crossplane/provider-userprovider/grpc-server/proto/gen/go/userapi"
 	"github.com/crossplane/provider-userprovider/internal/features"
-	"github.com/ksaritek/crossplane-provider-grpc/grpc-server/proto/gen/go/userapi"
 )
 
 const (
@@ -52,7 +56,14 @@ type UserService struct {
 }
 
 var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &UserService{}, nil }
+	newUserService = func(_ []byte) (*UserService, error) {
+		conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("Did not connect: %v", err)
+		}
+		cli := userapi.NewUserServiceClient(conn)
+		return &UserService{userCli: cli}, nil
+	}
 )
 
 // Setup adds a controller that reconciles User managed resources.
@@ -69,7 +80,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: newUserService}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -88,7 +99,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
+	newServiceFn func(creds []byte) (*UserService, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -97,27 +108,29 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.User)
-	if !ok {
-		return nil, errors.New(errNotUser)
-	}
+	// cr, ok := mg.(*v1alpha1.User)
+	// if !ok {
+	// 	return nil, errors.New(errNotUser)
+	// }
 
-	if err := c.usage.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
-	}
+	// if err := c.usage.Track(ctx, mg); err != nil {
+	// 	return nil, errors.Wrap(err, errTrackPCUsage)
+	// }
 
-	pc := &apisv1alpha1.ProviderConfig{}
-	if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.GetProviderConfigReference().Name}, pc); err != nil {
-		return nil, errors.Wrap(err, errGetPC)
-	}
+	// pc := &apisv1alpha1.ProviderConfig{}
+	// if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.GetProviderConfigReference().Name}, pc); err != nil {
+	// 	return nil, errors.Wrap(err, errGetPC)
+	// }
 
-	cd := pc.Spec.Credentials
-	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
-	if err != nil {
-		return nil, errors.Wrap(err, errGetCreds)
-	}
+	// cd := pc.Spec.Credentials
+	// data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
+	// if err != nil {
+	// 	return nil, errors.Wrap(err, errGetCreds)
+	// }
 
-	svc, err := c.newServiceFn(data)
+	fmt.Println(">>> connecting to grpc server")
+
+	svc, err := c.newServiceFn([]byte("fake creds"))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
@@ -130,7 +143,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	// A 'client' used to connect to the external resource API. In practice this
 	// would be something like an AWS SDK client.
-	service interface{}
+	service *UserService
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -139,8 +152,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotUser)
 	}
 
+	user, err := c.service.userCli.GetUser(ctx, &userapi.GetRequest{Id: cr.Spec.ForProvider.Id})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+
+		return managed.ExternalObservation{}, errors.Wrap(err, "cannot get user")
+	}
+
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing: %+v", cr)
+	fmt.Printf("Observed: %+v", user)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -160,6 +183,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
+	fmt.Println("Create is called")
 	cr, ok := mg.(*v1alpha1.User)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotUser)
@@ -167,11 +191,27 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	fmt.Printf("Creating: %+v", cr)
 
+	name := ""
+	if cr.Spec.ForProvider.Name != nil {
+		name = *cr.Spec.ForProvider.Name
+	}
+
+	email := ""
+	if cr.Spec.ForProvider.Email != nil {
+		email = *cr.Spec.ForProvider.Email
+	}
+
+	_, err := c.service.userCli.CreateUser(ctx,
+		&userapi.User{
+			Id:    cr.Spec.ForProvider.Id,
+			Name:  name,
+			Email: email})
+
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
 		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	}, err
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
